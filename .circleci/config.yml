@@ -12,7 +12,20 @@ jobs:
       - checkout
 
       - run: go get -u github.com/golang/dep/cmd/dep
-
       - run: dep ensure
+
       - run: go build -v
       - run: go test -v -race ./...
+
+      - deploy:
+          name: Publish Docker Image
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              docker build -t kubeapps/ratesvc:latest .
+              if [ -n "${CIRCLE_TAG}" ]; then
+                docker tag kubeapps/ratesvc:latest kubeapps/ratesvc:${CIRCLE_TAG}
+              fi
+
+              docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
+              docker push kubeapps/ratesvc
+            fi
