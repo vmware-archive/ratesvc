@@ -32,3 +32,13 @@ jobs:
               docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
               docker push kubeapps/ratesvc
             fi
+workflows:
+  version: 2
+  build-and-deploy:
+    jobs:
+      - build:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /^v[0-9].*$/
