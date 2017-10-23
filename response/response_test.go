@@ -26,6 +26,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type resource struct {
+	ID string `json:"id"`
+}
+
 func TestNewErrorResponse(t *testing.T) {
 	type args struct {
 		code    int
@@ -65,9 +69,6 @@ func TestErrorResponse_Write(t *testing.T) {
 }
 
 func TestNewDataResponse(t *testing.T) {
-	type resource struct {
-		ID string
-	}
 	tests := []struct {
 		name string
 		data interface{}
@@ -85,16 +86,13 @@ func TestNewDataResponse(t *testing.T) {
 }
 
 func TestDataResponse_Write(t *testing.T) {
-	type resource struct {
-		ID string `json:"id"`
-	}
 	tests := []struct {
 		name string
 		d    DataResponse
 		want string
 	}{
-		{"single resource", DataResponse{resource{"test"}}, `{"data":{"id":"test"}}`},
-		{"multiple resources", DataResponse{[]resource{{"one"}, {"two"}}}, `{"data":[{"id":"one"},{"id":"two"}]}`},
+		{"single resource", DataResponse{http.StatusOK, resource{"test"}}, `{"data":{"id":"test"}}`},
+		{"multiple resources", DataResponse{http.StatusOK, []resource{{"one"}, {"two"}}}, `{"data":[{"id":"one"},{"id":"two"}]}`},
 	}
 
 	for _, tt := range tests {
@@ -108,4 +106,11 @@ func TestDataResponse_Write(t *testing.T) {
 			assert.Equal(t, tt.want, body)
 		})
 	}
+}
+
+func TestDataResponse_WithCode(t *testing.T) {
+	d := NewDataResponse(resource{"test"})
+	assert.Equal(t, http.StatusOK, d.Code)
+	d = d.WithCode(http.StatusBadRequest)
+	assert.Equal(t, http.StatusBadRequest, d.Code)
 }
