@@ -24,11 +24,10 @@ jobs:
       - deploy:
           name: Publish Docker Image
           command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              if [ -n "${CIRCLE_TAG}" ]; then
+            if [[ "${CIRCLE_BRANCH}" == "master" || -n "${CIRCLE_TAG}" ]]; then
+              if [[ -n "${CIRCLE_TAG}" ]]; then
                 docker tag kubeapps/ratesvc:latest kubeapps/ratesvc:${CIRCLE_TAG}
               fi
-
               docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
               docker push kubeapps/ratesvc
             fi
