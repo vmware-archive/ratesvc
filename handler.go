@@ -80,37 +80,48 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Params validation
-	var it *item
-	if err := json.NewDecoder(req.Body).Decode(&it); err != nil {
+	var params *item
+	if err := json.NewDecoder(req.Body).Decode(&params); err != nil {
 		log.WithError(err).Error("could not parse request body")
 		response.NewErrorResponse(http.StatusBadRequest, "could not parse request body").Write(w)
 		return
 	}
 
-	if it.ID == "" {
+	if params.ID == "" {
 		response.NewErrorResponse(http.StatusBadRequest, "id missing in request body").Write(w)
 		return
 	}
 
-	if it.Type == "" {
-		it.Type = "chart"
+	if params.Type == "" {
+		params.Type = "chart"
 	}
 
-	if _, err := db.C(itemCollection).UpsertId(it.ID, it); err != nil {
-		log.WithError(err).Error("could not update item")
-		response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
-		return
-	}
+	var it item
+	err = db.C(itemCollection).FindId(params.ID).One(&it)
 
-	op := "$pull"
-	if it.HasStarred {
-		op = "$push"
-	}
+	if err != nil {
+		// Create the item if inexistant
+		it = *params
+		if params.HasStarred {
+			it.StargazersIDs = []bson.ObjectId{uid}
+		}
+		if err := db.C(itemCollection).Insert(it); err != nil {
+			log.WithError(err).Error("could not insert item")
+			response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
+			return
+		}
+	} else {
+		// Otherwise we just need to update the database
+		op := "$pull"
+		if params.HasStarred {
+			op = "$push"
+		}
 
-	if err := db.C(itemCollection).UpdateId(it.ID, bson.M{op: bson.M{"stargazers_ids": uid}}); err != nil {
-		log.WithError(err).Error("could not update item")
-		response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
-		return
+		if err := db.C(itemCollection).UpdateId(it.ID, bson.M{op: bson.M{"stargazers_ids": uid}}); err != nil {
+			log.WithError(err).Error("could not update item")
+			response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
+			return
+		}
 	}
 
 	response.NewDataResponse(it).WithCode(http.StatusCreated).Write(w)

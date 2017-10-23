@@ -19,6 +19,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -34,6 +35,8 @@ import (
 type body struct {
 	Data []item `json:"data"`
 }
+
+var itemsList []*item
 
 func TestGetStars(t *testing.T) {
 	var m mock.Mock
@@ -60,7 +63,7 @@ func TestGetStars(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m.On("All", mock.AnythingOfType("*[]*main.item")).Run(func(args mock.Arguments) {
+			m.On("All", &itemsList).Run(func(args mock.Arguments) {
 				*args.Get(0).(*[]*item) = tt.items
 			})
 
@@ -83,6 +86,9 @@ func TestGetStars(t *testing.T) {
 
 func TestUpdateStar(t *testing.T) {
 	var m mock.Mock
+	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(0).(*item) = item{ID: "stable/wordpress"}
+	})
 	dbSession = testutil.NewMockSession(&m)
 	currentUser := bson.NewObjectId()
 	oldGetCurrentUserID := getCurrentUserID
@@ -113,6 +119,38 @@ func TestUpdateStar(t *testing.T) {
 			req := httptest.NewRequest("PUT", "/v1/stars", bytes.NewBuffer([]byte(tt.requestBody)))
 			UpdateStar(w, req)
 			assert.Equal(t, tt.wantCode, w.Code)
+		})
+	}
+}
+
+func TestUpdateStarInsertsInexistantItem(t *testing.T) {
+	var m mock.Mock
+	m.On("One", &item{}).Return(errors.New("not found"))
+	dbSession = testutil.NewMockSession(&m)
+	currentUser := bson.NewObjectId()
+	oldGetCurrentUserID := getCurrentUserID
+	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
+	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+	tests := []struct {
+		name        string
+		requestBody string
+		unstar      bool
+	}{
+		{"valid", `{"id": "stable/wordpress", "has_starred": true}`, false},
+		{"valid unstar", `{"id": "stable/wordpress", "has_starred": false}`, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			toInsert := item{ID: "stable/wordpress", Type: "chart", HasStarred: !tt.unstar}
+			if !tt.unstar {
+				toInsert.StargazersIDs = []bson.ObjectId{currentUser}
+			}
+			m.On("Insert", toInsert)
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("PUT", "/v1/stars", bytes.NewBuffer([]byte(tt.requestBody)))
+			UpdateStar(w, req)
+			assert.Equal(t, http.StatusCreated, w.Code)
 		})
 	}
 }
