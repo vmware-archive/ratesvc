@@ -14,4 +14,5 @@ jobs:
       - run: go get -u github.com/golang/dep/cmd/dep
 
       - run: dep ensure
-      - run: go test -v ./...
+      - run: go build -v
+      - run: go test -v -race ./...
