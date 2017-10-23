@@ -38,6 +38,11 @@ func (c mockCollection) FindId(id interface{}) datastore.Query {
 	return mockQuery{c.Mock}
 }
 
+func (c mockCollection) Insert(docs ...interface{}) error {
+	c.Called(docs...)
+	return nil
+}
+
 func (c mockCollection) Upsert(selector interface{}, update interface{}) (*mgo.ChangeInfo, error) {
 	return nil, nil
 }
@@ -55,6 +60,10 @@ func (c mockCollection) Remove(selector interface{}) error {
 	return nil
 }
 
+func (c mockCollection) Count() (int, error) {
+	return 0, nil
+}
+
 // mockQuery acts as a mock datastore.Query
 type mockQuery struct {
 	*mock.Mock
@@ -66,7 +75,8 @@ func (q mockQuery) All(result interface{}) error {
 }
 
 func (q mockQuery) One(result interface{}) error {
-	return nil
+	args := q.Called(result)
+	return args.Error(0)
 }
 
 // NewMockSession returns a mocked Session

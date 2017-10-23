@@ -47,7 +47,7 @@
   branch = "master"
   name = "github.com/kubeapps/common"
   packages = ["datastore"]
-  revision = "2b565d483a2a36dc97bbc14ef004bc5e10bc3b82"
+  revision = "30a2bbb4f9a1afdd42327f33010d5fe734dbd2b9"
 
 [[projects]]
   name = "github.com/matttproud/golang_protobuf_extensions"
