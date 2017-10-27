@@ -58,12 +58,7 @@ func GetStars(w http.ResponseWriter, req *http.Request) {
 	for _, it := range items {
 		it.StargazersCount = len(it.StargazersIDs)
 		if currentUser, err := getCurrentUserID(req); err == nil {
-			for _, id := range it.StargazersIDs {
-				if id == currentUser {
-					it.HasStarred = true
-					break
-				}
-			}
+			it.HasStarred = hasStarred(it, currentUser)
 		}
 	}
 	response.NewDataResponse(items).Write(w)
@@ -167,4 +162,14 @@ var getCurrentUserID = func(req *http.Request) (bson.ObjectId, error) {
 		return claims.ID, nil
 	}
 	return "", errors.New("invalid token")
+}
+
+// hasStarred returns true if item is starred by the user
+func hasStarred(it *item, user bson.ObjectId) bool {
+	for _, id := range it.StargazersIDs {
+		if id == user {
+			return true
+		}
+	}
+	return false
 }
