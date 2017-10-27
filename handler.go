@@ -109,6 +109,11 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		// Otherwise we just need to update the database
 		op := "$pull"
 		if params.HasStarred {
+			// no-op if item is already starred by user
+			if hasStarred(&it, uid) {
+				response.NewDataResponse(it).WithCode(http.StatusCreated).Write(w)
+				return
+			}
 			op = "$push"
 		}
 
