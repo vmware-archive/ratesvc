@@ -142,9 +142,8 @@ func TestUpdateStarDoesNotDuplicate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.wantCode == http.StatusOK {
-				m.On("UpdateId", "stable/wordpress", bson.M{"$push": bson.M{"stargazers_ids": currentUser}})
-			}
+			m.AssertNotCalled(t, "UpdateId")
+
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("PUT", "/v1/stars", bytes.NewBuffer([]byte(tt.requestBody)))
 			UpdateStar(w, req)
