@@ -111,7 +111,7 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		if params.HasStarred {
 			// no-op if item is already starred by user
 			if hasStarred(&it, uid) {
-				response.NewDataResponse(it).WithCode(http.StatusCreated).Write(w)
+				response.NewDataResponse(it).WithCode(http.StatusOK).Write(w)
 				return
 			}
 			op = "$push"
