@@ -133,23 +133,13 @@ func TestUpdateStarDoesNotDuplicate(t *testing.T) {
 	oldGetCurrentUserID := getCurrentUserID
 	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
 	defer func() { getCurrentUserID = oldGetCurrentUserID }()
-	tests := []struct {
-		name        string
-		requestBody string
-		wantCode    int
-	}{
-		{"noop", `{"id": "stable/wordpress", "has_starred": true}`, http.StatusOK},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m.AssertNotCalled(t, "UpdateId")
 
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("PUT", "/v1/stars", bytes.NewBuffer([]byte(tt.requestBody)))
-			UpdateStar(w, req)
-			assert.Equal(t, tt.wantCode, w.Code)
-		})
-	}
+	m.AssertNotCalled(t, "UpdateId")
+	w := httptest.NewRecorder()
+	requestBody := `{"id": "stable/wordpress", "has_starred": true}`
+	req := httptest.NewRequest("PUT", "/v1/stars", bytes.NewBuffer([]byte(requestBody)))
+	UpdateStar(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestUpdateStarInsertsInexistantItem(t *testing.T) {
