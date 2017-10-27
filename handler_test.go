@@ -123,6 +123,25 @@ func TestUpdateStar(t *testing.T) {
 	}
 }
 
+func TestUpdateStarDoesNotDuplicate(t *testing.T) {
+	var m mock.Mock
+	currentUser := bson.NewObjectId()
+	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(0).(*item) = item{ID: "stable/wordpress", StargazersIDs: []bson.ObjectId{currentUser}}
+	})
+	dbSession = testutil.NewMockSession(&m)
+	oldGetCurrentUserID := getCurrentUserID
+	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
+	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+
+	m.AssertNotCalled(t, "UpdateId")
+	w := httptest.NewRecorder()
+	requestBody := `{"id": "stable/wordpress", "has_starred": true}`
+	req := httptest.NewRequest("PUT", "/v1/stars", bytes.NewBuffer([]byte(requestBody)))
+	UpdateStar(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
 func TestUpdateStarInsertsInexistantItem(t *testing.T) {
 	var m mock.Mock
 	m.On("One", &item{}).Return(errors.New("not found"))
