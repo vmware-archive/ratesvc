@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/kubeapps/ratesvc/response"
 	log "github.com/sirupsen/logrus"
 
@@ -43,6 +45,16 @@ type item struct {
 	StargazersCount int `json:"stargazers_count" bson:"-"`
 	// Whether the current user has starred the item, only exposed in the JSON response
 	HasStarred bool `json:"has_starred" bson:"-"`
+	// Comments collection
+	Comments []comment `json:"-"`
+}
+
+// Defines a comment object
+type comment struct {
+	ID        bson.ObjectId `json:"id" bson:"_id,omitempty"`
+	UserID    bson.ObjectId `json:"user_id" bson:"user_id"`
+	Text      string        `json:"text" bson:"text"`
+	CreatedAt time.Time     `json:"created_at" bson:"created_at"`
 }
 
 // GetStars returns a list of starred items
@@ -72,6 +84,7 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 	uid, err := getCurrentUserID(req)
 	if err != nil {
 		response.NewErrorResponse(http.StatusUnauthorized, "unauthorized").Write(w)
+		return
 	}
 
 	// Params validation
@@ -127,14 +140,73 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 	response.NewDataResponse(it).WithCode(http.StatusCreated).Write(w)
 }
 
-// GetComments returns a list of comments for an item
+// GetComments returns a list of comments
 func GetComments(w http.ResponseWriter, req *http.Request) {
-	panic("not implemented")
+	db, closer := dbSession.DB()
+	defer closer()
+
+	vars := mux.Vars(req)
+	itemId := vars["repo"] + "/" + vars["chartName"]
+
+	var it item
+	if err := db.C(itemCollection).FindId(itemId).One(&it); err != nil {
+		response.NewDataResponse([]int64{}).Write(w)
+		return
+	}
+	response.NewDataResponse(it.Comments).Write(w)
 }
 
-// CreateComment creates a comment for an item
+// CreateComment creates a comment and appends the comment to the item.Comments array
 func CreateComment(w http.ResponseWriter, req *http.Request) {
-	panic("not implemented")
+	db, closer := dbSession.DB()
+	defer closer()
+
+	vars := mux.Vars(req)
+	itemId := vars["repo"] + "/" + vars["chartName"]
+
+	uid, err := getCurrentUserID(req)
+	if err != nil {
+		response.NewErrorResponse(http.StatusUnauthorized, "unauthorized").Write(w)
+		return
+	}
+
+	// Params validation
+	var cm comment
+	if err := json.NewDecoder(req.Body).Decode(&cm); err != nil {
+		log.WithError(err).Error("could not parse request body")
+		response.NewErrorResponse(http.StatusBadRequest, "could not parse request body").Write(w)
+		return
+	}
+
+	if cm.Text == "" {
+		response.NewErrorResponse(http.StatusBadRequest, "text missing in request body").Write(w)
+		return
+	}
+
+	cm.ID = getNewObjectID()
+	cm.UserID = uid
+	cm.CreatedAt = getTimestamp()
+
+	var it item
+	if err = db.C(itemCollection).FindId(itemId).One(&it); err != nil {
+		// Create the item if inexistant
+		it.Type = "chart"
+		it.ID = itemId
+		it.Comments = []comment{cm}
+		if err := db.C(itemCollection).Insert(it); err != nil {
+			log.WithError(err).Error("could not insert item")
+			response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
+			return
+		}
+	} else {
+		// Append comment to collection
+		if err = db.C(itemCollection).UpdateId(it.ID, bson.M{"$push": bson.M{"comments": cm}}); err != nil {
+			log.WithError(err).Error("could not update item")
+			response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
+			return
+		}
+	}
+	response.NewDataResponse(cm).WithCode(http.StatusCreated).Write(w)
 }
 
 type userClaims struct {
@@ -167,6 +239,14 @@ var getCurrentUserID = func(req *http.Request) (bson.ObjectId, error) {
 		return claims.ID, nil
 	}
 	return "", errors.New("invalid token")
+}
+
+var getNewObjectID = func() bson.ObjectId {
+	return bson.NewObjectId()
+}
+
+var getTimestamp = func() time.Time {
+	return time.Now()
 }
 
 // hasStarred returns true if item is starred by the user
