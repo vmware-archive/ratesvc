@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/kubeapps/ratesvc/testutil"
 	"github.com/stretchr/testify/assert"
@@ -184,19 +185,42 @@ func TestUpdateStarUnauthorized(t *testing.T) {
 }
 
 func TestGetComments(t *testing.T) {
-	type args struct {
-		w   http.ResponseWriter
-		req *http.Request
-	}
+	var m mock.Mock
+	dbSession = testutil.NewMockSession(&m)
+	currentUser := bson.NewObjectId()
+	oldGetCurrentUserID := getCurrentUserID
+	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
+	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+
 	tests := []struct {
-		name string
-		args args
+		name     string
+		item     item
+		cm_count int
 	}{
-	// TODO: Add test cases.
+		{"no comments", item{ID: "stable/wordpress", Type: "chart", Comments: []comment{}}, 0},
+		{"one comment",
+			item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
+				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "Hello, World!", CreatedAt: time.Now()},
+			}}, 1},
+		{"two comments",
+			item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
+				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "Hello", CreatedAt: time.Now()},
+				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "World!", CreatedAt: time.Now()},
+			}}, 2},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			GetComments(tt.args.w, tt.args.req)
+			m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
+				*args.Get(0).(*item) = tt.item
+			})
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/v1/comments/stable/wordpress", nil)
+			GetComments(w, req)
+			assert.Equal(t, http.StatusOK, w.Code)
+			var b body
+			json.NewDecoder(w.Body).Decode(&b)
+			require.Len(t, b.Data, tt.cm_count)
 		})
 	}
 }

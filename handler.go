@@ -140,9 +140,20 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 	response.NewDataResponse(it).WithCode(http.StatusCreated).Write(w)
 }
 
-// GetComments returns a list of comments for an item
+// GetComments returns a list of comments
 func GetComments(w http.ResponseWriter, req *http.Request) {
-	panic("not implemented")
+	db, closer := dbSession.DB()
+	defer closer()
+
+	vars := mux.Vars(req)
+	itemId := vars["repo"] + "/" + vars["chartName"]
+
+	var it item
+	if err := db.C(itemCollection).FindId(itemId).One(&it); err != nil {
+		response.NewErrorResponse(http.StatusNotFound, "item does not exist").Write(w)
+		return
+	}
+	response.NewDataResponse(it.Comments).Write(w)
 }
 
 // CreateComment creates a comment and appends the comment to the item.Comments array
