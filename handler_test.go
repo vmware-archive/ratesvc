@@ -268,6 +268,15 @@ func TestCreateComment(t *testing.T) {
 	}
 }
 
+func TestCreateCommentUnauthorized(t *testing.T) {
+	var m mock.Mock
+	dbSession = testutil.NewMockSession(&m)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/v1/comments/stable/wordpress", nil)
+	CreateComment(w, req)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
 func Test_getCurrentUserID(t *testing.T) {
 	type args struct {
 		req *http.Request
