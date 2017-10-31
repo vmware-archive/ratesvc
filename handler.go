@@ -183,9 +183,9 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	cm.ID = bson.NewObjectId()
+	cm.ID = getNewObjectID()
 	cm.UserID = uid
-	cm.CreatedAt = time.Now()
+	cm.CreatedAt = getTimestamp()
 
 	var it item
 	if err = db.C(itemCollection).FindId(itemId).One(&it); err != nil {
@@ -239,6 +239,14 @@ var getCurrentUserID = func(req *http.Request) (bson.ObjectId, error) {
 		return claims.ID, nil
 	}
 	return "", errors.New("invalid token")
+}
+
+var getNewObjectID = func() bson.ObjectId {
+	return bson.NewObjectId()
+}
+
+var getTimestamp = func() time.Time {
+	return time.Now()
 }
 
 // hasStarred returns true if item is starred by the user

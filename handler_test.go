@@ -226,19 +226,44 @@ func TestGetComments(t *testing.T) {
 }
 
 func TestCreateComment(t *testing.T) {
-	type args struct {
-		w   http.ResponseWriter
-		req *http.Request
-	}
+	var m mock.Mock
+	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(0).(*item) = item{ID: "stable/wordpress"}
+	})
+	dbSession = testutil.NewMockSession(&m)
+	currentUser := bson.NewObjectId()
+	oldGetCurrentUserID := getCurrentUserID
+	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
+	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+
+	commentId := getNewObjectID()
+	oldGetNewObjectID := getNewObjectID
+	getNewObjectID = func() bson.ObjectId { return commentId }
+	defer func() { getNewObjectID = oldGetNewObjectID }()
+
+	commentTimestamp := getTimestamp()
+	oldGetTimestamp := getTimestamp
+	getTimestamp = func() time.Time { return commentTimestamp }
+	defer func() { getTimestamp = oldGetTimestamp }()
+
 	tests := []struct {
-		name string
-		args args
+		name        string
+		requestBody string
+		wantCode    int
 	}{
-	// TODO: Add test cases.
+		{"invalid", `NOTJSON`, http.StatusBadRequest},
+		{"no text", `{}`, http.StatusBadRequest},
+		{"valid", `{"text": "Hello, World"}`, http.StatusCreated},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			CreateComment(tt.args.w, tt.args.req)
+			if tt.wantCode == http.StatusCreated {
+				m.On("UpdateId", "stable/wordpress", bson.M{"$push": bson.M{"comments": comment{ID: commentId, UserID: currentUser, Text: "Hello, World", CreatedAt: commentTimestamp}}})
+			}
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("POST", "/v1/comments/stable/wordpress", bytes.NewBuffer([]byte(tt.requestBody)))
+			CreateComment(w, req)
+			assert.Equal(t, tt.wantCode, w.Code)
 		})
 	}
 }
