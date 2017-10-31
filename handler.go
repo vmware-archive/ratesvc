@@ -150,7 +150,7 @@ func GetComments(w http.ResponseWriter, req *http.Request) {
 
 	var it item
 	if err := db.C(itemCollection).FindId(itemId).One(&it); err != nil {
-		response.NewErrorResponse(http.StatusNotFound, "item does not exist").Write(w)
+		response.NewDataResponse([]int64{}).Write(w)
 		return
 	}
 	response.NewDataResponse(it.Comments).Write(w)
