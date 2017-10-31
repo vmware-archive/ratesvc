@@ -72,6 +72,7 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 	uid, err := getCurrentUserID(req)
 	if err != nil {
 		response.NewErrorResponse(http.StatusUnauthorized, "unauthorized").Write(w)
+		return
 	}
 
 	// Params validation
