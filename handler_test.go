@@ -201,12 +201,12 @@ func TestGetComments(t *testing.T) {
 		{"no comments", item{ID: "stable/wordpress", Type: "chart", Comments: []comment{}}, 0},
 		{"one comment",
 			item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
-				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "Hello, World!", CreatedAt: time.Now()},
+				{ID: bson.NewObjectId(), Text: "Hello, World!", CreatedAt: time.Now(), Author: currentUser},
 			}}, 1},
 		{"two comments",
 			item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
-				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "Hello", CreatedAt: time.Now()},
-				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "World!", CreatedAt: time.Now()},
+				{ID: bson.NewObjectId(), Text: "Hello", CreatedAt: time.Now(), Author: currentUser},
+				{ID: bson.NewObjectId(), Text: "World!", CreatedAt: time.Now(), Author: currentUser},
 			}}, 2},
 	}
 
@@ -259,7 +259,7 @@ func TestCreateComment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.wantCode == http.StatusCreated {
-				m.On("UpdateId", "stable/wordpress", bson.M{"$push": bson.M{"comments": comment{ID: commentId, UserID: currentUser.ID, Text: "Hello, World", CreatedAt: commentTimestamp}}})
+				m.On("UpdateId", "stable/wordpress", bson.M{"$push": bson.M{"comments": comment{ID: commentId, Text: "Hello, World", CreatedAt: commentTimestamp, Author: currentUser}}})
 			}
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("POST", "/v1/comments/stable/wordpress", bytes.NewBuffer([]byte(tt.requestBody)))

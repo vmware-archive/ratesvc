@@ -50,17 +50,17 @@ type item struct {
 }
 
 type User struct {
-	ID    bson.ObjectId
-	Name  string
-	Email string
+	ID    bson.ObjectId `json:"id" bson:"id"`
+	Name  string        `json:"name" bson:"name"`
+	Email string        `json:"email" bson:"email"`
 }
 
 // Defines a comment object
 type comment struct {
 	ID        bson.ObjectId `json:"id" bson:"_id,omitempty"`
-	UserID    bson.ObjectId `json:"user_id" bson:"user_id"`
 	Text      string        `json:"text" bson:"text"`
 	CreatedAt time.Time     `json:"created_at" bson:"created_at"`
+	Author    *User         `json:"author" bson:"author"`
 }
 
 // GetStars returns a list of starred items
@@ -190,8 +190,8 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 	}
 
 	cm.ID = getNewObjectID()
-	cm.UserID = user.ID
 	cm.CreatedAt = getTimestamp()
+	cm.Author = user
 
 	var it item
 	if err = db.C(itemCollection).FindId(itemId).One(&it); err != nil {
