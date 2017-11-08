@@ -76,7 +76,7 @@ func GetStars(w http.ResponseWriter, req *http.Request) {
 	for _, it := range items {
 		it.StargazersCount = len(it.StargazersIDs)
 		if user, err := getCurrentUser(req); err == nil {
-			it.HasStarred = hasStarred(it, user.ID)
+			it.HasStarred = hasStarred(it, user)
 		}
 	}
 	response.NewDataResponse(items).Write(w)
@@ -129,7 +129,7 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		op := "$pull"
 		if params.HasStarred {
 			// no-op if item is already starred by user
-			if hasStarred(&it, user.ID) {
+			if hasStarred(&it, user) {
 				response.NewDataResponse(it).WithCode(http.StatusOK).Write(w)
 				return
 			}
@@ -256,9 +256,9 @@ var getTimestamp = func() time.Time {
 }
 
 // hasStarred returns true if item is starred by the user
-func hasStarred(it *item, user bson.ObjectId) bool {
+func hasStarred(it *item, user *User) bool {
 	for _, id := range it.StargazersIDs {
-		if id == user {
+		if id == user.ID {
 			return true
 		}
 	}
