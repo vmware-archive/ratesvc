@@ -49,6 +49,12 @@ type item struct {
 	Comments []comment `json:"-"`
 }
 
+type User struct {
+	ID    bson.ObjectId
+	Name  string
+	Email string
+}
+
 // Defines a comment object
 type comment struct {
 	ID        bson.ObjectId `json:"id" bson:"_id,omitempty"`
@@ -69,8 +75,8 @@ func GetStars(w http.ResponseWriter, req *http.Request) {
 	}
 	for _, it := range items {
 		it.StargazersCount = len(it.StargazersIDs)
-		if currentUser, err := getCurrentUserID(req); err == nil {
-			it.HasStarred = hasStarred(it, currentUser)
+		if user, err := getCurrentUser(req); err == nil {
+			it.HasStarred = hasStarred(it, user.ID)
 		}
 	}
 	response.NewDataResponse(items).Write(w)
@@ -81,7 +87,7 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 	db, closer := dbSession.DB()
 	defer closer()
 
-	uid, err := getCurrentUserID(req)
+	user, err := getCurrentUser(req)
 	if err != nil {
 		response.NewErrorResponse(http.StatusUnauthorized, "unauthorized").Write(w)
 		return
@@ -111,7 +117,7 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		// Create the item if inexistant
 		it = *params
 		if params.HasStarred {
-			it.StargazersIDs = []bson.ObjectId{uid}
+			it.StargazersIDs = []bson.ObjectId{user.ID}
 		}
 		if err := db.C(itemCollection).Insert(it); err != nil {
 			log.WithError(err).Error("could not insert item")
@@ -123,14 +129,14 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		op := "$pull"
 		if params.HasStarred {
 			// no-op if item is already starred by user
-			if hasStarred(&it, uid) {
+			if hasStarred(&it, user.ID) {
 				response.NewDataResponse(it).WithCode(http.StatusOK).Write(w)
 				return
 			}
 			op = "$push"
 		}
 
-		if err := db.C(itemCollection).UpdateId(it.ID, bson.M{op: bson.M{"stargazers_ids": uid}}); err != nil {
+		if err := db.C(itemCollection).UpdateId(it.ID, bson.M{op: bson.M{"stargazers_ids": user.ID}}); err != nil {
 			log.WithError(err).Error("could not update item")
 			response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
 			return
@@ -164,7 +170,7 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	itemId := vars["repo"] + "/" + vars["chartName"]
 
-	uid, err := getCurrentUserID(req)
+	user, err := getCurrentUser(req)
 	if err != nil {
 		response.NewErrorResponse(http.StatusUnauthorized, "unauthorized").Write(w)
 		return
@@ -184,7 +190,7 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 	}
 
 	cm.ID = getNewObjectID()
-	cm.UserID = uid
+	cm.UserID = user.ID
 	cm.CreatedAt = getTimestamp()
 
 	var it item
@@ -210,19 +216,19 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 }
 
 type userClaims struct {
-	ID bson.ObjectId
+	*User
 	jwt.StandardClaims
 }
 
-var getCurrentUserID = func(req *http.Request) (bson.ObjectId, error) {
+var getCurrentUser = func(req *http.Request) (*User, error) {
 	jwtKey, ok := os.LookupEnv("JWT_KEY")
 	if !ok {
-		return "", errors.New("JWT_KEY not set")
+		return nil, errors.New("JWT_KEY not set")
 	}
 
 	cookie, err := req.Cookie("ka_auth")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	token, err := jwt.ParseWithClaims(cookie.Value, &userClaims{}, func(token *jwt.Token) (interface{}, error) {
@@ -232,13 +238,13 @@ var getCurrentUserID = func(req *http.Request) (bson.ObjectId, error) {
 		return []byte(jwtKey), nil
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if claims, ok := token.Claims.(*userClaims); ok && token.Valid {
-		return claims.ID, nil
+		return claims.User, nil
 	}
-	return "", errors.New("invalid token")
+	return nil, errors.New("invalid token")
 }
 
 var getNewObjectID = func() bson.ObjectId {
