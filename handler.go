@@ -17,9 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -50,9 +52,10 @@ type item struct {
 }
 
 type User struct {
-	ID    bson.ObjectId `json:"id" bson:"id"`
-	Name  string        `json:"name" bson:"name"`
-	Email string        `json:"email" bson:"email"`
+	ID        bson.ObjectId `json:"id" bson:"id"`
+	Name      string        `json:"name" bson:"name"`
+	Email     string        `json:"email" bson:"email"`
+	AvatarUrl string        `json:"avatar_url" bson:"-"`
 }
 
 // Defines a comment object
@@ -158,6 +161,12 @@ func GetComments(w http.ResponseWriter, req *http.Request) {
 	if err := db.C(itemCollection).FindId(itemId).One(&it); err != nil {
 		response.NewDataResponse([]int64{}).Write(w)
 		return
+	}
+
+	for _, cm := range it.Comments {
+		h := md5.New()
+		io.WriteString(h, cm.Author.Email)
+		cm.Author.AvatarUrl = fmt.Sprintf("https://s.gravatar.com/avatar/%x", h.Sum(nil))
 	}
 	response.NewDataResponse(it.Comments).Write(w)
 }
