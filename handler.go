@@ -76,10 +76,12 @@ func GetStars(w http.ResponseWriter, req *http.Request) {
 		response.NewErrorResponse(http.StatusInternalServerError, "could not fetch all items").Write(w)
 		return
 	}
+
+	currentUser, _ := getCurrentUser(req)
 	for _, it := range items {
 		it.StargazersCount = len(it.StargazersIDs)
-		if user, err := getCurrentUser(req); err == nil {
-			it.HasStarred = hasStarred(it, user)
+		if currentUser != nil {
+			it.HasStarred = hasStarred(it, currentUser)
 		}
 	}
 	response.NewDataResponse(items).Write(w)
