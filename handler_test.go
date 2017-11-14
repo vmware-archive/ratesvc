@@ -42,10 +42,10 @@ var itemsList []*item
 func TestGetStars(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := bson.NewObjectId()
-	oldGetCurrentUserID := getCurrentUserID
-	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
-	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	oldGetCurrentUser := getCurrentUser
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name          string
 		items         []*item
@@ -59,7 +59,7 @@ func TestGetStars(t *testing.T) {
 			{ID: "stable/drupal", Type: "chart", StargazersIDs: []bson.ObjectId{bson.NewObjectId()}},
 		}, false},
 		{"starred by user", []*item{
-			{ID: "stable/wordpress", Type: "chart", StargazersIDs: []bson.ObjectId{bson.NewObjectId(), currentUser}},
+			{ID: "stable/wordpress", Type: "chart", StargazersIDs: []bson.ObjectId{bson.NewObjectId(), currentUser.ID}},
 		}, true},
 	}
 	for _, tt := range tests {
@@ -91,10 +91,10 @@ func TestUpdateStar(t *testing.T) {
 		*args.Get(0).(*item) = item{ID: "stable/wordpress"}
 	})
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := bson.NewObjectId()
-	oldGetCurrentUserID := getCurrentUserID
-	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
-	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	oldGetCurrentUser := getCurrentUser
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name        string
 		requestBody string
@@ -113,7 +113,7 @@ func TestUpdateStar(t *testing.T) {
 				if tt.unstar {
 					op = "$pull"
 				}
-				m.On("UpdateId", "stable/wordpress", bson.M{op: bson.M{"stargazers_ids": currentUser}})
+				m.On("UpdateId", "stable/wordpress", bson.M{op: bson.M{"stargazers_ids": currentUser.ID}})
 			}
 
 			w := httptest.NewRecorder()
@@ -126,14 +126,15 @@ func TestUpdateStar(t *testing.T) {
 
 func TestUpdateStarDoesNotDuplicate(t *testing.T) {
 	var m mock.Mock
-	currentUser := bson.NewObjectId()
-	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
-		*args.Get(0).(*item) = item{ID: "stable/wordpress", StargazersIDs: []bson.ObjectId{currentUser}}
-	})
 	dbSession = testutil.NewMockSession(&m)
-	oldGetCurrentUserID := getCurrentUserID
-	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
-	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	oldGetCurrentUser := getCurrentUser
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	defer func() { getCurrentUser = oldGetCurrentUser }()
+
+	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(0).(*item) = item{ID: "stable/wordpress", StargazersIDs: []bson.ObjectId{currentUser.ID}}
+	})
 
 	m.AssertNotCalled(t, "UpdateId")
 	w := httptest.NewRecorder()
@@ -147,10 +148,10 @@ func TestUpdateStarInsertsInexistantItem(t *testing.T) {
 	var m mock.Mock
 	m.On("One", &item{}).Return(errors.New("not found"))
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := bson.NewObjectId()
-	oldGetCurrentUserID := getCurrentUserID
-	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
-	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	oldGetCurrentUser := getCurrentUser
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name        string
 		requestBody string
@@ -163,7 +164,7 @@ func TestUpdateStarInsertsInexistantItem(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			toInsert := item{ID: "stable/wordpress", Type: "chart", HasStarred: !tt.unstar}
 			if !tt.unstar {
-				toInsert.StargazersIDs = []bson.ObjectId{currentUser}
+				toInsert.StargazersIDs = []bson.ObjectId{currentUser.ID}
 			}
 			m.On("Insert", toInsert)
 
@@ -187,10 +188,10 @@ func TestUpdateStarUnauthorized(t *testing.T) {
 func TestGetComments(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := bson.NewObjectId()
-	oldGetCurrentUserID := getCurrentUserID
-	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
-	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	oldGetCurrentUser := getCurrentUser
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	defer func() { getCurrentUser = oldGetCurrentUser }()
 
 	tests := []struct {
 		name     string
@@ -200,12 +201,12 @@ func TestGetComments(t *testing.T) {
 		{"no comments", item{ID: "stable/wordpress", Type: "chart", Comments: []comment{}}, 0},
 		{"one comment",
 			item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
-				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "Hello, World!", CreatedAt: time.Now()},
+				{ID: bson.NewObjectId(), Text: "Hello, World!", CreatedAt: time.Now(), Author: currentUser},
 			}}, 1},
 		{"two comments",
 			item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
-				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "Hello", CreatedAt: time.Now()},
-				{ID: bson.NewObjectId(), UserID: bson.NewObjectId(), Text: "World!", CreatedAt: time.Now()},
+				{ID: bson.NewObjectId(), Text: "Hello", CreatedAt: time.Now(), Author: currentUser},
+				{ID: bson.NewObjectId(), Text: "World!", CreatedAt: time.Now(), Author: currentUser},
 			}}, 2},
 	}
 
@@ -231,10 +232,10 @@ func TestCreateComment(t *testing.T) {
 		*args.Get(0).(*item) = item{ID: "stable/wordpress"}
 	})
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := bson.NewObjectId()
-	oldGetCurrentUserID := getCurrentUserID
-	getCurrentUserID = func(_ *http.Request) (bson.ObjectId, error) { return currentUser, nil }
-	defer func() { getCurrentUserID = oldGetCurrentUserID }()
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	oldGetCurrentUser := getCurrentUser
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	defer func() { getCurrentUser = oldGetCurrentUser }()
 
 	commentId := getNewObjectID()
 	oldGetNewObjectID := getNewObjectID
@@ -258,7 +259,7 @@ func TestCreateComment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.wantCode == http.StatusCreated {
-				m.On("UpdateId", "stable/wordpress", bson.M{"$push": bson.M{"comments": comment{ID: commentId, UserID: currentUser, Text: "Hello, World", CreatedAt: commentTimestamp}}})
+				m.On("UpdateId", "stable/wordpress", bson.M{"$push": bson.M{"comments": comment{ID: commentId, Text: "Hello, World", CreatedAt: commentTimestamp, Author: currentUser}}})
 			}
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("POST", "/v1/comments/stable/wordpress", bytes.NewBuffer([]byte(tt.requestBody)))
@@ -277,7 +278,7 @@ func TestCreateCommentUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
-func Test_getCurrentUserID(t *testing.T) {
+func Test_getCurrentUser(t *testing.T) {
 	type args struct {
 		req *http.Request
 	}
@@ -291,13 +292,13 @@ func Test_getCurrentUserID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getCurrentUserID(tt.args.req)
+			got, err := getCurrentUser(tt.args.req)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getCurrentUserID() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("getCurrentUser() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getCurrentUserID() = %v, want %v", got, tt.want)
+				t.Errorf("getCurrentUser() = %v, want %v", got, tt.want)
 			}
 		})
 	}
