@@ -54,7 +54,7 @@ type item struct {
 type user struct {
 	ID        bson.ObjectId `json:"id" bson:"_id"`
 	Name      string        `json:"name"`
-	Email     string        `json:"email"`
+	Email     string        `json:"-"`
 	AvatarUrl string        `json:"avatar_url" bson:"-"`
 }
 
@@ -228,6 +228,7 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 
 type userClaims struct {
 	*user
+	Email string
 	jwt.StandardClaims
 }
 
@@ -253,6 +254,7 @@ var getCurrentUser = func(req *http.Request) (*user, error) {
 	}
 
 	if claims, ok := token.Claims.(*userClaims); ok && token.Valid {
+		claims.user.Email = claims.Email
 		return claims.user, nil
 	}
 	return nil, errors.New("invalid token")
