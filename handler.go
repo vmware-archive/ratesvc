@@ -52,18 +52,18 @@ type item struct {
 }
 
 type user struct {
-	ID        bson.ObjectId `json:"id" bson:"id"`
-	Name      string        `json:"name" bson:"name"`
-	Email     string        `json:"email" bson:"email"`
+	ID        bson.ObjectId `json:"id" bson:"_id"`
+	Name      string        `json:"name"`
+	Email     string        `json:"email"`
 	AvatarUrl string        `json:"avatar_url" bson:"-"`
 }
 
 // Defines a comment object
 type comment struct {
 	ID        bson.ObjectId `json:"id" bson:"_id,omitempty"`
-	Text      string        `json:"text" bson:"text"`
+	Text      string        `json:"text"`
 	CreatedAt time.Time     `json:"created_at" bson:"created_at"`
-	Author    *user         `json:"author" bson:"author"`
+	Author    *user         `json:"author"`
 }
 
 // GetStars returns a list of starred items
