@@ -92,7 +92,7 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 	db, closer := dbSession.DB()
 	defer closer()
 
-	user, err := getCurrentUser(req)
+	currentUser, err := getCurrentUser(req)
 	if err != nil {
 		response.NewErrorResponse(http.StatusUnauthorized, "unauthorized").Write(w)
 		return
@@ -122,7 +122,7 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		// Create the item if inexistant
 		it = *params
 		if params.HasStarred {
-			it.StargazersIDs = []bson.ObjectId{user.ID}
+			it.StargazersIDs = []bson.ObjectId{currentUser.ID}
 		}
 		if err := db.C(itemCollection).Insert(it); err != nil {
 			log.WithError(err).Error("could not insert item")
@@ -134,14 +134,14 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		op := "$pull"
 		if params.HasStarred {
 			// no-op if item is already starred by user
-			if hasStarred(&it, user) {
+			if hasStarred(&it, currentUser) {
 				response.NewDataResponse(it).WithCode(http.StatusOK).Write(w)
 				return
 			}
 			op = "$push"
 		}
 
-		if err := db.C(itemCollection).UpdateId(it.ID, bson.M{op: bson.M{"stargazers_ids": user.ID}}); err != nil {
+		if err := db.C(itemCollection).UpdateId(it.ID, bson.M{op: bson.M{"stargazers_ids": currentUser.ID}}); err != nil {
 			log.WithError(err).Error("could not update item")
 			response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
 			return
@@ -181,7 +181,7 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	itemId := vars["repo"] + "/" + vars["chartName"]
 
-	user, err := getCurrentUser(req)
+	currentUser, err := getCurrentUser(req)
 	if err != nil {
 		response.NewErrorResponse(http.StatusUnauthorized, "unauthorized").Write(w)
 		return
@@ -202,7 +202,7 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 
 	cm.ID = getNewObjectID()
 	cm.CreatedAt = getTimestamp()
-	cm.Author = user
+	cm.Author = currentUser
 
 	var it item
 	if err = db.C(itemCollection).FindId(itemId).One(&it); err != nil {
@@ -269,9 +269,9 @@ var getTimestamp = func() time.Time {
 }
 
 // hasStarred returns true if item is starred by the user
-func hasStarred(it *item, user *user) bool {
+func hasStarred(it *item, currentUser *user) bool {
 	for _, id := range it.StargazersIDs {
-		if id == user.ID {
+		if id == currentUser.ID {
 			return true
 		}
 	}
