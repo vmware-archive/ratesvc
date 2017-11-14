@@ -42,9 +42,9 @@ var itemsList []*item
 func TestGetStars(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name          string
@@ -91,9 +91,9 @@ func TestUpdateStar(t *testing.T) {
 		*args.Get(0).(*item) = item{ID: "stable/wordpress"}
 	})
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name        string
@@ -127,9 +127,9 @@ func TestUpdateStar(t *testing.T) {
 func TestUpdateStarDoesNotDuplicate(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 
 	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
@@ -148,9 +148,9 @@ func TestUpdateStarInsertsInexistantItem(t *testing.T) {
 	var m mock.Mock
 	m.On("One", &item{}).Return(errors.New("not found"))
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name        string
@@ -188,9 +188,9 @@ func TestUpdateStarUnauthorized(t *testing.T) {
 func TestGetComments(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 
 	tests := []struct {
@@ -232,9 +232,9 @@ func TestCreateComment(t *testing.T) {
 		*args.Get(0).(*item) = item{ID: "stable/wordpress"}
 	})
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 
 	commentId := getNewObjectID()

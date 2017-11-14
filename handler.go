@@ -51,7 +51,7 @@ type item struct {
 	Comments []comment `json:"-"`
 }
 
-type User struct {
+type user struct {
 	ID        bson.ObjectId `json:"id" bson:"id"`
 	Name      string        `json:"name" bson:"name"`
 	Email     string        `json:"email" bson:"email"`
@@ -63,7 +63,7 @@ type comment struct {
 	ID        bson.ObjectId `json:"id" bson:"_id,omitempty"`
 	Text      string        `json:"text" bson:"text"`
 	CreatedAt time.Time     `json:"created_at" bson:"created_at"`
-	Author    *User         `json:"author" bson:"author"`
+	Author    *user         `json:"author" bson:"author"`
 }
 
 // GetStars returns a list of starred items
@@ -225,11 +225,11 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 }
 
 type userClaims struct {
-	*User
+	*user
 	jwt.StandardClaims
 }
 
-var getCurrentUser = func(req *http.Request) (*User, error) {
+var getCurrentUser = func(req *http.Request) (*user, error) {
 	jwtKey, ok := os.LookupEnv("JWT_KEY")
 	if !ok {
 		return nil, errors.New("JWT_KEY not set")
@@ -251,7 +251,7 @@ var getCurrentUser = func(req *http.Request) (*User, error) {
 	}
 
 	if claims, ok := token.Claims.(*userClaims); ok && token.Valid {
-		return claims.User, nil
+		return claims.user, nil
 	}
 	return nil, errors.New("invalid token")
 }
@@ -265,7 +265,7 @@ var getTimestamp = func() time.Time {
 }
 
 // hasStarred returns true if item is starred by the user
-func hasStarred(it *item, user *User) bool {
+func hasStarred(it *item, user *user) bool {
 	for _, id := range it.StargazersIDs {
 		if id == user.ID {
 			return true
