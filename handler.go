@@ -223,6 +223,12 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
+
+	// update avatar_url in response object
+	h := md5.New()
+	io.WriteString(h, cm.Author.Email)
+	cm.Author.AvatarUrl = fmt.Sprintf("https://s.gravatar.com/avatar/%x", h.Sum(nil))
+
 	response.NewDataResponse(cm).WithCode(http.StatusCreated).Write(w)
 }
 
