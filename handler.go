@@ -34,6 +34,17 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// Params a key-value map of path params
+type Params map[string]string
+
+// WithParams can be used to wrap handlers to take an extra arg for path params
+type WithParams func(http.ResponseWriter, *http.Request, Params)
+
+func (h WithParams) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	h(w, req, vars)
+}
+
 const itemCollection = "items"
 
 type item struct {
@@ -152,14 +163,12 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 }
 
 // GetComments returns a list of comments
-func GetComments(w http.ResponseWriter, req *http.Request) {
+func GetComments(w http.ResponseWriter, req *http.Request, params Params) {
 	db, closer := dbSession.DB()
 	defer closer()
 
-	vars := mux.Vars(req)
-	itemId := vars["repo"] + "/" + vars["chartName"]
-
 	var it item
+	itemId := params["repo"] + "/" + params["chartName"]
 	if err := db.C(itemCollection).FindId(itemId).One(&it); err != nil {
 		response.NewDataResponse([]int64{}).Write(w)
 		return
@@ -174,12 +183,9 @@ func GetComments(w http.ResponseWriter, req *http.Request) {
 }
 
 // CreateComment creates a comment and appends the comment to the item.Comments array
-func CreateComment(w http.ResponseWriter, req *http.Request) {
+func CreateComment(w http.ResponseWriter, req *http.Request, params Params) {
 	db, closer := dbSession.DB()
 	defer closer()
-
-	vars := mux.Vars(req)
-	itemId := vars["repo"] + "/" + vars["chartName"]
 
 	currentUser, err := getCurrentUser(req)
 	if err != nil {
@@ -205,6 +211,7 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 	cm.Author = currentUser
 
 	var it item
+	itemId := params["repo"] + "/" + params["chartName"]
 	if err = db.C(itemCollection).FindId(itemId).One(&it); err != nil {
 		// Create the item if inexistant
 		it.Type = "chart"
@@ -230,6 +237,52 @@ func CreateComment(w http.ResponseWriter, req *http.Request) {
 	cm.Author.AvatarUrl = fmt.Sprintf("https://s.gravatar.com/avatar/%x", h.Sum(nil))
 
 	response.NewDataResponse(cm).WithCode(http.StatusCreated).Write(w)
+}
+
+// DeleteComment delete's an existing comment
+func DeleteComment(w http.ResponseWriter, req *http.Request, params Params) {
+	db, closer := dbSession.DB()
+	defer closer()
+
+	itemId := params["repo"] + "/" + params["chartName"]
+	commentId := bson.ObjectIdHex(params["commentId"])
+
+	currentUser, err := getCurrentUser(req)
+	if err != nil {
+		response.NewErrorResponse(http.StatusUnauthorized, "unauthorized").Write(w)
+		return
+	}
+
+	var it item
+	if err := db.C(itemCollection).FindId(itemId).One(&it); err != nil {
+		response.NewErrorResponse(http.StatusNotFound, "comment not found").Write(w)
+		return
+	}
+
+	var cm comment
+	for _, c := range it.Comments {
+		if commentId == c.ID {
+			cm = c
+			break
+		}
+	}
+
+	if cm == (comment{}) {
+		response.NewErrorResponse(http.StatusNotFound, "comment not found").Write(w)
+		return
+	}
+
+	// Users can only delete their own comments
+	if cm.Author.ID != currentUser.ID {
+		response.NewErrorResponse(http.StatusUnauthorized, "not authorized to delete this comment").Write(w)
+		return
+	}
+
+	if err = db.C(itemCollection).UpdateId(it.ID, bson.M{"$pull": bson.M{"comments": cm}}); err != nil {
+		response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
+		return
+	}
+	response.NewDataResponse(cm).WithCode(http.StatusAccepted).Write(w)
 }
 
 type userClaims struct {

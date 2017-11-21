@@ -217,7 +217,11 @@ func TestGetComments(t *testing.T) {
 			})
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/v1/comments/stable/wordpress", nil)
-			GetComments(w, req)
+			params := Params{
+				"repo":      "stable",
+				"chartName": "wordpress",
+			}
+			GetComments(w, req, params)
 			assert.Equal(t, http.StatusOK, w.Code)
 			var b body
 			json.NewDecoder(w.Body).Decode(&b)
@@ -263,7 +267,11 @@ func TestCreateComment(t *testing.T) {
 			}
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("POST", "/v1/comments/stable/wordpress", bytes.NewBuffer([]byte(tt.requestBody)))
-			CreateComment(w, req)
+			params := Params{
+				"repo":      "stable",
+				"chartName": "wordpress",
+			}
+			CreateComment(w, req, params)
 			assert.Equal(t, tt.wantCode, w.Code)
 		})
 	}
@@ -274,7 +282,107 @@ func TestCreateCommentUnauthorized(t *testing.T) {
 	dbSession = testutil.NewMockSession(&m)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/v1/comments/stable/wordpress", nil)
-	CreateComment(w, req)
+	params := Params{
+		"repo":      "stable",
+		"chartName": "wordpress",
+	}
+	CreateComment(w, req, params)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestDeleteComment(t *testing.T) {
+	var m mock.Mock
+	dbSession = testutil.NewMockSession(&m)
+
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	oldGetCurrentUser := getCurrentUser
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	defer func() { getCurrentUser = oldGetCurrentUser }()
+
+	commentId := getNewObjectID()
+	oldGetNewObjectID := getNewObjectID
+	getNewObjectID = func() bson.ObjectId { return commentId }
+	defer func() { getNewObjectID = oldGetNewObjectID }()
+
+	commentTimestamp := getTimestamp()
+	oldGetTimestamp := getTimestamp
+	getTimestamp = func() time.Time { return commentTimestamp }
+	defer func() { getTimestamp = oldGetTimestamp }()
+
+	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(0).(*item) = item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
+			comment{ID: bson.NewObjectId(), Text: "First comment", CreatedAt: getTimestamp(), Author: currentUser},
+			comment{ID: commentId, Text: "Second comment", CreatedAt: commentTimestamp, Author: currentUser},
+		}}
+	})
+
+	tests := []struct {
+		name      string
+		commentId string
+		wantCode  int
+	}{
+		{"does not exist", "5a0e9183833def3853088836", http.StatusNotFound},
+		{"exists", commentId.Hex(), http.StatusAccepted},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.wantCode == http.StatusAccepted {
+				m.On("UpdateId", "stable/wordpress", bson.M{"$pull": bson.M{"comments": comment{ID: commentId, Text: "Second comment", Author: currentUser, CreatedAt: commentTimestamp}}})
+			}
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("DELETE", "/v1/comments/stable/wordpress"+tt.commentId, nil)
+			params := Params{
+				"repo":      "stable",
+				"chartName": "wordpress",
+				"commentId": tt.commentId,
+			}
+			DeleteComment(w, req, params)
+			assert.Equal(t, tt.wantCode, w.Code)
+		})
+	}
+}
+
+func TestDeleteCommentUnauthorized(t *testing.T) {
+	var m mock.Mock
+	dbSession = testutil.NewMockSession(&m)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("DELETE", "/v1/comments/stable/wordpress/5a0e9183833def3853088836", nil)
+	params := Params{
+		"repo":      "stable",
+		"chartName": "wordpress",
+		"commentId": "5a0e9183833def3853088836",
+	}
+	DeleteComment(w, req, params)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestDeleteCommentCannotDeleteOtherUsersComments(t *testing.T) {
+	var m mock.Mock
+	dbSession = testutil.NewMockSession(&m)
+	w := httptest.NewRecorder()
+
+	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	oldGetCurrentUser := getCurrentUser
+	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	defer func() { getCurrentUser = oldGetCurrentUser }()
+
+	commentId := getNewObjectID()
+	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(0).(*item) = item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
+			comment{ID: bson.NewObjectId(), Author: &user{ID: bson.NewObjectId()}},
+			comment{ID: commentId, Author: &user{ID: bson.NewObjectId()}},
+		}}
+	})
+
+	req := httptest.NewRequest("DELETE", "/v1/comments/stable/wordpress/"+commentId.Hex(), nil)
+	params := Params{
+		"repo":      "stable",
+		"chartName": "wordpress",
+		"commentId": commentId.Hex(),
+	}
+	DeleteComment(w, req, params)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 

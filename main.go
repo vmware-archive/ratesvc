@@ -53,8 +53,9 @@ func main() {
 	apiv1 := r.PathPrefix("/v1").Subrouter()
 	apiv1.Methods("GET").Path("/stars").HandlerFunc(GetStars)
 	apiv1.Methods("PUT").Path("/stars").HandlerFunc(UpdateStar)
-	apiv1.Methods("GET").Path("/comments/{repo}/{chartName}").HandlerFunc(GetComments)
-	apiv1.Methods("POST").Path("/comments/{repo}/{chartName}").HandlerFunc(CreateComment)
+	apiv1.Methods("GET").Path("/comments/{repo}/{chartName}").Handler(WithParams(GetComments))
+	apiv1.Methods("POST").Path("/comments/{repo}/{chartName}").Handler(WithParams(CreateComment))
+	apiv1.Methods("DELETE").Path("/comments/{repo}/{chartName}/{commentId}").Handler(WithParams(DeleteComment))
 
 	n := negroni.Classic()
 	n.UseHandler(r)
