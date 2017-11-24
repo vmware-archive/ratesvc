@@ -31,15 +31,15 @@ import (
 var dbSession datastore.Session
 
 func main() {
-	dbHost := flag.String("mongo-host", "localhost:27017", "MongoDB host")
+	dbURL := flag.String("mongo-url", "localhost", "MongoDB URL (see https://godoc.org/labix.org/v2/mgo#Dial for format)")
 	dbName := flag.String("mongo-database", "ratesvc", "MongoDB database")
 	flag.Parse()
 
-	mongoConfig := datastore.Config{Host: *dbHost, Database: *dbName}
+	mongoConfig := datastore.Config{URL: *dbURL, Database: *dbName}
 	var err error
 	dbSession, err = datastore.NewSession(mongoConfig)
 	if err != nil {
-		log.WithFields(log.Fields{"host": *dbHost}).Fatal(err)
+		log.WithFields(log.Fields{"host": *dbURL}).Fatal(err)
 	}
 
 	r := mux.NewRouter()
