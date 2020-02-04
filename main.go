@@ -33,9 +33,11 @@ var dbSession datastore.Session
 func main() {
 	dbURL := flag.String("mongo-url", "localhost", "MongoDB URL (see https://godoc.org/labix.org/v2/mgo#Dial for format)")
 	dbName := flag.String("mongo-database", "ratesvc", "MongoDB database")
+	dbUsername := flag.String("mongo-user", "", "MongoDB user")
+	dbPassword := os.Getenv("MONGO_PASSWORD")
 	flag.Parse()
 
-	mongoConfig := datastore.Config{URL: *dbURL, Database: *dbName}
+	mongoConfig := datastore.Config{URL: *dbURL, Database: *dbName, Username: *dbUsername, Password: dbPassword}
 	var err error
 	dbSession, err = datastore.NewSession(mongoConfig)
 	if err != nil {
