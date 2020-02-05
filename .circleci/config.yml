@@ -6,15 +6,12 @@ jobs:
   build:
     docker:
       # specify the version
-      - image: circleci/golang:1.9
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/kubeapps/ratesvc
     steps:
       - checkout
       - setup_remote_docker:
-          version: 17.07.0-ce
-
-      - run: go get -u github.com/golang/dep/cmd/dep
-      - run: dep ensure
+          version: 18.09.3
 
       - run: go build -v
       - run: go test -v -race ./...
