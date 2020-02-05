@@ -13,5 +13,5 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/unrolled/render v1.0.2
 	github.com/urfave/negroni v1.0.0
-	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
+	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0 // indirect
 )
