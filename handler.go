@@ -53,7 +53,7 @@ type item struct {
 	// Type could be "chart", "function", etc.
 	Type string `json:"type"`
 	// List of IDs of Stargazers that will be stored in the database
-	StargazersIDs []bson.ObjectId `json:"stargazers_ids" bson:"stargazers_ids"`
+	StargazersIDs []bson.ObjectId `json:"-" bson:"stargazers_ids"`
 	// Count of the Stargazers which is only exposed in the JSON response
 	StargazersCount int `json:"stargazers_count" bson:"-"`
 	// Whether the current user has starred the item, only exposed in the JSON response
@@ -118,7 +118,6 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Infof("Params? %v", params)
 	if params.ID == "" {
 		response.NewErrorResponse(http.StatusBadRequest, "id missing in request body").Write(w)
 		return
@@ -137,9 +136,6 @@ func UpdateStar(w http.ResponseWriter, req *http.Request) {
 		if params.HasStarred {
 			it.StargazersIDs = []bson.ObjectId{currentUser.ID}
 		}
-		log.Infof("Item? %v", it)
-		d, err := json.Marshal(it)
-		log.Infof("Item json? %v %v", string(d), err)
 		if err := db.C(itemCollection).Insert(it); err != nil {
 			log.WithError(err).Error("could not insert item")
 			response.NewErrorResponse(http.StatusInternalServerError, "internal server error").Write(w)
