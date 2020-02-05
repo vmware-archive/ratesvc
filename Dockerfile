@@ -3,7 +3,6 @@
 FROM golang:1.13 as builder
 WORKDIR /go/src/github.com/kubeapps/ratesvc
 COPY go.mod go.sum ./
-COPY vendor vendor
 COPY response response
 COPY testutil testutil
 COPY *.go ./
