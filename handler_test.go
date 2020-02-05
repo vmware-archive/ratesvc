@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/globalsign/mgo/bson"
 	"github.com/kubeapps/ratesvc/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type body struct {
@@ -42,9 +42,9 @@ var itemsList []*item
 func TestGetStars(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name          string
@@ -91,9 +91,9 @@ func TestUpdateStar(t *testing.T) {
 		*args.Get(0).(*item) = item{ID: "stable/wordpress"}
 	})
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name        string
@@ -127,9 +127,9 @@ func TestUpdateStar(t *testing.T) {
 func TestUpdateStarDoesNotDuplicate(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 
 	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
@@ -148,9 +148,9 @@ func TestUpdateStarInsertsInexistantItem(t *testing.T) {
 	var m mock.Mock
 	m.On("One", &item{}).Return(errors.New("not found"))
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 	tests := []struct {
 		name        string
@@ -188,15 +188,15 @@ func TestUpdateStarUnauthorized(t *testing.T) {
 func TestGetComments(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 
 	tests := []struct {
-		name     string
-		item     item
-		cm_count int
+		name    string
+		item    item
+		cmCount int
 	}{
 		{"no comments", item{ID: "stable/wordpress", Type: "chart", Comments: []comment{}}, 0},
 		{"one comment",
@@ -225,7 +225,7 @@ func TestGetComments(t *testing.T) {
 			assert.Equal(t, http.StatusOK, w.Code)
 			var b body
 			json.NewDecoder(w.Body).Decode(&b)
-			require.Len(t, b.Data, tt.cm_count)
+			require.Len(t, b.Data, tt.cmCount)
 		})
 	}
 }
@@ -236,14 +236,14 @@ func TestCreateComment(t *testing.T) {
 		*args.Get(0).(*item) = item{ID: "stable/wordpress"}
 	})
 	dbSession = testutil.NewMockSession(&m)
-	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 
-	commentId := getNewObjectID()
+	commentID := getNewObjectID()
 	oldGetNewObjectID := getNewObjectID
-	getNewObjectID = func() bson.ObjectId { return commentId }
+	getNewObjectID = func() bson.ObjectId { return commentID }
 	defer func() { getNewObjectID = oldGetNewObjectID }()
 
 	commentTimestamp := getTimestamp()
@@ -263,7 +263,7 @@ func TestCreateComment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.wantCode == http.StatusCreated {
-				m.On("UpdateId", "stable/wordpress", bson.M{"$push": bson.M{"comments": comment{ID: commentId, Text: "Hello, World", CreatedAt: commentTimestamp, Author: currentUser}}})
+				m.On("UpdateId", "stable/wordpress", bson.M{"$push": bson.M{"comments": comment{ID: commentID, Text: "Hello, World", CreatedAt: commentTimestamp, Author: currentUser}}})
 			}
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("POST", "/v1/comments/stable/wordpress", bytes.NewBuffer([]byte(tt.requestBody)))
@@ -294,14 +294,14 @@ func TestDeleteComment(t *testing.T) {
 	var m mock.Mock
 	dbSession = testutil.NewMockSession(&m)
 
-	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 
-	commentId := getNewObjectID()
+	commentID := getNewObjectID()
 	oldGetNewObjectID := getNewObjectID
-	getNewObjectID = func() bson.ObjectId { return commentId }
+	getNewObjectID = func() bson.ObjectId { return commentID }
 	defer func() { getNewObjectID = oldGetNewObjectID }()
 
 	commentTimestamp := getTimestamp()
@@ -312,31 +312,31 @@ func TestDeleteComment(t *testing.T) {
 	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(0).(*item) = item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
 			comment{ID: bson.NewObjectId(), Text: "First comment", CreatedAt: getTimestamp(), Author: currentUser},
-			comment{ID: commentId, Text: "Second comment", CreatedAt: commentTimestamp, Author: currentUser},
+			comment{ID: commentID, Text: "Second comment", CreatedAt: commentTimestamp, Author: currentUser},
 		}}
 	})
 
 	tests := []struct {
 		name      string
-		commentId string
+		commentID string
 		wantCode  int
 	}{
 		{"does not exist", "5a0e9183833def3853088836", http.StatusNotFound},
-		{"exists", commentId.Hex(), http.StatusAccepted},
+		{"exists", commentID.Hex(), http.StatusAccepted},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.wantCode == http.StatusAccepted {
-				m.On("UpdateId", "stable/wordpress", bson.M{"$pull": bson.M{"comments": comment{ID: commentId, Text: "Second comment", Author: currentUser, CreatedAt: commentTimestamp}}})
+				m.On("UpdateId", "stable/wordpress", bson.M{"$pull": bson.M{"comments": comment{ID: commentID, Text: "Second comment", Author: currentUser, CreatedAt: commentTimestamp}}})
 			}
 
 			w := httptest.NewRecorder()
-			req := httptest.NewRequest("DELETE", "/v1/comments/stable/wordpress"+tt.commentId, nil)
+			req := httptest.NewRequest("DELETE", "/v1/comments/stable/wordpress"+tt.commentID, nil)
 			params := Params{
 				"repo":      "stable",
 				"chartName": "wordpress",
-				"commentId": tt.commentId,
+				"commentId": tt.commentID,
 			}
 			DeleteComment(w, req, params)
 			assert.Equal(t, tt.wantCode, w.Code)
@@ -363,24 +363,24 @@ func TestDeleteCommentCannotDeleteOtherUsersComments(t *testing.T) {
 	dbSession = testutil.NewMockSession(&m)
 	w := httptest.NewRecorder()
 
-	currentUser := &user{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
+	currentUser := &User{ID: bson.NewObjectId(), Name: "Rick Sanchez", Email: "rick@sanchez.com"}
 	oldGetCurrentUser := getCurrentUser
-	getCurrentUser = func(_ *http.Request) (*user, error) { return currentUser, nil }
+	getCurrentUser = func(_ *http.Request) (*User, error) { return currentUser, nil }
 	defer func() { getCurrentUser = oldGetCurrentUser }()
 
-	commentId := getNewObjectID()
+	commentID := getNewObjectID()
 	m.On("One", &item{}).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(0).(*item) = item{ID: "stable/wordpress", Type: "chart", Comments: []comment{
-			comment{ID: bson.NewObjectId(), Author: &user{ID: bson.NewObjectId()}},
-			comment{ID: commentId, Author: &user{ID: bson.NewObjectId()}},
+			comment{ID: bson.NewObjectId(), Author: &User{ID: bson.NewObjectId()}},
+			comment{ID: commentID, Author: &User{ID: bson.NewObjectId()}},
 		}}
 	})
 
-	req := httptest.NewRequest("DELETE", "/v1/comments/stable/wordpress/"+commentId.Hex(), nil)
+	req := httptest.NewRequest("DELETE", "/v1/comments/stable/wordpress/"+commentID.Hex(), nil)
 	params := Params{
 		"repo":      "stable",
 		"chartName": "wordpress",
-		"commentId": commentId.Hex(),
+		"commentId": commentID.Hex(),
 	}
 	DeleteComment(w, req, params)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
@@ -396,7 +396,7 @@ func Test_getCurrentUser(t *testing.T) {
 		want    bson.ObjectId
 		wantErr bool
 	}{
-	// TODO: Add test cases.
+		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

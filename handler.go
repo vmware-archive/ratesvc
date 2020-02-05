@@ -31,7 +31,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo/bson"
 )
 
 // Params a key-value map of path params
@@ -62,11 +62,12 @@ type item struct {
 	Comments []comment `json:"-"`
 }
 
-type user struct {
+// User represents user info
+type User struct {
 	ID        bson.ObjectId `json:"id" bson:"_id"`
 	Name      string        `json:"name"`
 	Email     string        `json:"-"`
-	AvatarUrl string        `json:"avatar_url" bson:"-"`
+	AvatarURL string        `json:"avatar_url" bson:"-"`
 }
 
 // Defines a comment object
@@ -74,7 +75,7 @@ type comment struct {
 	ID        bson.ObjectId `json:"id" bson:"_id,omitempty"`
 	Text      string        `json:"text"`
 	CreatedAt time.Time     `json:"created_at" bson:"created_at"`
-	Author    *user         `json:"author"`
+	Author    *User         `json:"author"`
 }
 
 // GetStars returns a list of starred items
@@ -168,8 +169,8 @@ func GetComments(w http.ResponseWriter, req *http.Request, params Params) {
 	defer closer()
 
 	var it item
-	itemId := params["repo"] + "/" + params["chartName"]
-	if err := db.C(itemCollection).FindId(itemId).One(&it); err != nil {
+	itemID := params["repo"] + "/" + params["chartName"]
+	if err := db.C(itemCollection).FindId(itemID).One(&it); err != nil {
 		response.NewDataResponse([]int64{}).Write(w)
 		return
 	}
@@ -177,7 +178,7 @@ func GetComments(w http.ResponseWriter, req *http.Request, params Params) {
 	for _, cm := range it.Comments {
 		h := md5.New()
 		io.WriteString(h, cm.Author.Email)
-		cm.Author.AvatarUrl = fmt.Sprintf("https://s.gravatar.com/avatar/%x", h.Sum(nil))
+		cm.Author.AvatarURL = fmt.Sprintf("https://s.gravatar.com/avatar/%x", h.Sum(nil))
 	}
 	response.NewDataResponse(it.Comments).Write(w)
 }
@@ -211,11 +212,11 @@ func CreateComment(w http.ResponseWriter, req *http.Request, params Params) {
 	cm.Author = currentUser
 
 	var it item
-	itemId := params["repo"] + "/" + params["chartName"]
-	if err = db.C(itemCollection).FindId(itemId).One(&it); err != nil {
+	itemID := params["repo"] + "/" + params["chartName"]
+	if err = db.C(itemCollection).FindId(itemID).One(&it); err != nil {
 		// Create the item if inexistant
 		it.Type = "chart"
-		it.ID = itemId
+		it.ID = itemID
 		it.Comments = []comment{cm}
 		if err := db.C(itemCollection).Insert(it); err != nil {
 			log.WithError(err).Error("could not insert item")
@@ -234,7 +235,7 @@ func CreateComment(w http.ResponseWriter, req *http.Request, params Params) {
 	// update avatar_url in response object
 	h := md5.New()
 	io.WriteString(h, cm.Author.Email)
-	cm.Author.AvatarUrl = fmt.Sprintf("https://s.gravatar.com/avatar/%x", h.Sum(nil))
+	cm.Author.AvatarURL = fmt.Sprintf("https://s.gravatar.com/avatar/%x", h.Sum(nil))
 
 	response.NewDataResponse(cm).WithCode(http.StatusCreated).Write(w)
 }
@@ -244,8 +245,8 @@ func DeleteComment(w http.ResponseWriter, req *http.Request, params Params) {
 	db, closer := dbSession.DB()
 	defer closer()
 
-	itemId := params["repo"] + "/" + params["chartName"]
-	commentId := bson.ObjectIdHex(params["commentId"])
+	itemID := params["repo"] + "/" + params["chartName"]
+	commentID := bson.ObjectIdHex(params["commentId"])
 
 	currentUser, err := getCurrentUser(req)
 	if err != nil {
@@ -254,14 +255,14 @@ func DeleteComment(w http.ResponseWriter, req *http.Request, params Params) {
 	}
 
 	var it item
-	if err := db.C(itemCollection).FindId(itemId).One(&it); err != nil {
+	if err := db.C(itemCollection).FindId(itemID).One(&it); err != nil {
 		response.NewErrorResponse(http.StatusNotFound, "comment not found").Write(w)
 		return
 	}
 
 	var cm comment
 	for _, c := range it.Comments {
-		if commentId == c.ID {
+		if commentID == c.ID {
 			cm = c
 			break
 		}
@@ -286,12 +287,12 @@ func DeleteComment(w http.ResponseWriter, req *http.Request, params Params) {
 }
 
 type userClaims struct {
-	*user
+	*User
 	Email string
 	jwt.StandardClaims
 }
 
-var getCurrentUser = func(req *http.Request) (*user, error) {
+var getCurrentUser = func(req *http.Request) (*User, error) {
 	jwtKey, ok := os.LookupEnv("JWT_KEY")
 	if !ok {
 		return nil, errors.New("JWT_KEY not set")
@@ -313,8 +314,8 @@ var getCurrentUser = func(req *http.Request) (*user, error) {
 	}
 
 	if claims, ok := token.Claims.(*userClaims); ok && token.Valid {
-		claims.user.Email = claims.Email
-		return claims.user, nil
+		claims.User.Email = claims.Email
+		return claims.User, nil
 	}
 	return nil, errors.New("invalid token")
 }
@@ -328,7 +329,7 @@ var getTimestamp = func() time.Time {
 }
 
 // hasStarred returns true if item is starred by the user
-func hasStarred(it *item, currentUser *user) bool {
+func hasStarred(it *item, currentUser *User) bool {
 	for _, id := range it.StargazersIDs {
 		if id == currentUser.ID {
 			return true
